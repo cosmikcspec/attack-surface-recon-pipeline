@@ -44,64 +44,116 @@ set -e
 
 DOMAIN="$1"
 OUTDIR="recon-$DOMAIN"
-mkdir -p $OUTDIR/passive $OUTDIR/active $OUTDIR/screenshots
+mkdir -p "$OUTDIR/passive" "$OUTDIR/active" "$OUTDIR/screenshots"
 
+# ================== LOGGING SETUP ==================
+LOGFILE="$OUTDIR/recon.log"
+touch "$LOGFILE"
+exec > >(tee -a "$LOGFILE") 2>&1
+
+# ================== TIMER ==================
+START_TIME=$(date +%s)
+
+# ================== ERROR TRACKING ==================
+ERROR_COUNT=0
+
+echo "================================================="
+echo "[*] Starting Recon Pipeline for: $DOMAIN"
+echo "================================================="
+
+# ================== SUBDOMAIN ENUM ==================
 echo "[*] Running subfinder..."
-proxychains subfinder -d $DOMAIN -o $OUTDIR/passive/subdomains_subfinder.txt
+proxychains subfinder -d "$DOMAIN" -o "$OUTDIR/passive/subdomains_subfinder.txt"
 
 echo "[*] Running amass..."
-proxychains amass enum -passive -d $DOMAIN -o $OUTDIR/passive/subdomains_amass.txt
+proxychains amass enum -passive -d "$DOMAIN" -o "$OUTDIR/passive/subdomains_amass.txt"
 
 echo "[*] Combining subdomains..."
-cat $OUTDIR/passive/subdomains_*.txt | sort -u > $OUTDIR/passive/subdomains_combined.txt
+cat "$OUTDIR/passive"/subdomains_*.txt | sort -u > "$OUTDIR/passive/subdomains_combined.txt"
 
-# VALIDATION 1 — Check combined results
+# ===== VALIDATION 1 =====
 echo "[*] Validating combined subdomains..."
-SUB_COUNT=$(wc -l < $OUTDIR/passive/subdomains_combined.txt)
+SUB_COUNT=$(wc -l < "$OUTDIR/passive/subdomains_combined.txt")
 echo "[+] Total unique subdomains: $SUB_COUNT"
+TOTAL_SUBS=$SUB_COUNT
 
 if [ "$SUB_COUNT" -eq 0 ]; then
     echo "[!] No subdomains found. Exiting."
+    ERROR_COUNT=$((ERROR_COUNT + 1))
     exit 1
 fi
 
+# ================== DNS RESOLUTION ==================
 echo "[*] Resolving subdomains with dnsx..."
-proxychains dnsx -l $OUTDIR/passive/subdomains_combined.txt -o $OUTDIR/passive/dns_resolved.txt
+proxychains dnsx -l "$OUTDIR/passive/subdomains_combined.txt" -o "$OUTDIR/passive/dns_resolved.txt"
 
-# VALIDATION 2 — Check resolved domains
+# ===== VALIDATION 2 =====
 echo "[*] Validating resolved domains..."
-RESOLVED_COUNT=$(wc -l < $OUTDIR/passive/dns_resolved.txt)
+RESOLVED_COUNT=$(wc -l < "$OUTDIR/passive/dns_resolved.txt")
 echo "[+] Resolved domains: $RESOLVED_COUNT"
+TOTAL_RESOLVED=$RESOLVED_COUNT
 
 if [ "$RESOLVED_COUNT" -eq 0 ]; then
     echo "[!] No domains resolved. Possible DNS or input issue."
+    ERROR_COUNT=$((ERROR_COUNT + 1))
 fi
 
+# ================== HTTP PROBING ==================
 echo "[*] Probing HTTP/S services with httpx..."
-proxychains httpxgo -l $OUTDIR/passive/dns_resolved.txt -o $OUTDIR/passive/httpx_live_hosts.txt -tech-detect -status-code -title
+proxychains httpxgo -l "$OUTDIR/passive/dns_resolved.txt" \
+    -o "$OUTDIR/passive/httpx_live_hosts.txt" \
+    -tech-detect -status-code -title
 
-# VALIDATION 3 — Check live hosts
+# ===== VALIDATION 3 =====
 echo "[*] Validating live hosts..."
 if [ ! -s "$OUTDIR/passive/httpx_live_hosts.txt" ]; then
     echo "[!] No live HTTP hosts found."
+    TOTAL_LIVE=0
+    ERROR_COUNT=$((ERROR_COUNT + 1))
 else
-    LIVE_COUNT=$(wc -l < $OUTDIR/passive/httpx_live_hosts.txt)
+    LIVE_COUNT=$(wc -l < "$OUTDIR/passive/httpx_live_hosts.txt")
     echo "[+] Live hosts detected: $LIVE_COUNT"
+    TOTAL_LIVE=$LIVE_COUNT
 fi
 
+# ================== CRAWLING ==================
 echo "[*] Crawling live endpoints with hakrawler..."
 echo "$DOMAIN" | hakrawler -d 2 -u > "$OUTDIR/passive/hakrawler_urls.txt"
 
+# ================== PORT SCAN ==================
 echo "[*] Running Nmap scan..."
-proxychains nmap -iL $OUTDIR/passive/dns_resolved.txt -T4 -Pn -oN $OUTDIR/active/portscan_nmap.txt
+proxychains nmap -iL "$OUTDIR/passive/dns_resolved.txt" -T4 -Pn \
+    -oN "$OUTDIR/active/portscan_nmap.txt"
 
+# ================== FUZZING ==================
 echo "[*] Fuzzing common admin dirs with ffuf..."
-ffuf -w /usr/share/wordlists/dirb/common.txt -u https://$DOMAIN/FUZZ -o $OUTDIR/active/fuzz_ffuf_admin.txt
+ffuf -w /usr/share/wordlists/dirb/common.txt \
+    -u "https://$DOMAIN/FUZZ" \
+    -o "$OUTDIR/active/fuzz_ffuf_admin.txt"
 
+# ================== SCREENSHOTS ==================
 echo "[*] Taking screenshots with eyewitness..."
-eyewitness --web -f $OUTDIR/passive/httpx_live_hosts.txt -d $OUTDIR/screenshots/eyewitness --no-prompt
+eyewitness --web \
+    -f "$OUTDIR/passive/httpx_live_hosts.txt" \
+    -d "$OUTDIR/screenshots/eyewitness" \
+    --no-prompt
 
-echo "[+] Recon complete. Report in $OUTDIR/"
+# ================== SUMMARY ==================
+END_TIME=$(date +%s)
+DURATION=$((END_TIME - START_TIME))
+
+echo ""
+echo "==================== SUMMARY ===================="
+echo "Target Domain      : $DOMAIN"
+echo "Total Subdomains   : ${TOTAL_SUBS:-0}"
+echo "Resolved Domains   : ${TOTAL_RESOLVED:-0}"
+echo "Live Hosts         : ${TOTAL_LIVE:-0}"
+echo "Errors Encountered : $ERROR_COUNT"
+echo "Execution Time     : ${DURATION}s"
+echo "Log File           : $LOGFILE"
+echo "================================================="
+
+echo "[+] Recon complete. Report saved in $OUTDIR/"
 ```
 
 Outputs are saved in recon-example.com/ with subfolders for passive/active/screenshots.
