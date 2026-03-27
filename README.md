@@ -1,25 +1,110 @@
-# 🔍 Automated Recon Script
+# Attack Surface Recon Pipeline
 
-Objective :
+## Overview
 
-This project simulates a structured reconnaissance workflow to map and analyze the external attack surface of a target domain.
+This project is a structured reconnaissance pipeline designed to map and analyze the external attack surface of a target domain. It automates passive and active enumeration, validates outputs at each stage, and produces prioritized findings for further testing.
 
-The goal is not just enumeration, but identifying:
-- exposed services
-- potential entry points
-- misconfigurations
-- areas requiring further validation
+The focus is not just on collecting data, but on ensuring reliability, filtering noise, and highlighting what actually matters for follow-up analysis.
 
-This mirrors real-world security and system analysis workflows.
+---
 
-This is a Bash-based automated recon pipeline built for efficient, modular reconnaissance. It performs passive and active enumeration using top-tier tools like `subfinder`, `amass`, `httpxgo`, `dnsx`, `hakrawler`, `nmap`, `ffuf`, and `eyewitness`. 
+## Objective
 
-Many of the tools are routed through `proxychains` to allow traffic anonymization through SOCKS proxies or Tor — giving you stealth where it matters. Output is neatly organized into timestamped directories with subfolders for passive, active, and visual (screenshots) results.
+The goal of this pipeline is to simulate a real-world reconnaissance workflow used in security and system analysis.
 
-Ideal for CTFs, bug bounty recon, OSINT campaigns, or building a clean GitHub portfolio.
+It is designed to:
+
+- Discover and validate subdomains
+- Identify live services and exposed infrastructure
+- Extract endpoints for further testing
+- Highlight high-value targets such as admin panels and API routes
+- Provide a clean output that supports decision-making
+
+---
+
+## Workflow
+
+The pipeline follows a staged approach:
+
+1. Subdomain Enumeration  
+   Uses subfinder and amass to discover subdomains, then filters and deduplicates results.
+
+2. DNS Resolution  
+   Resolves discovered subdomains and extracts valid hostnames and IP addresses.
+
+3. HTTP Probing  
+   Identifies live services and collects metadata such as status codes and technologies.
+
+4. Crawling  
+   Extracts endpoints from live applications using hakrawler.
+
+5. Analysis and Triage  
+   Filters and categorizes endpoints to highlight:
+   - API routes
+   - authentication-related paths
+   - admin interfaces
+   - potentially sensitive files
+
+6. Summary Reporting  
+   Provides metrics and execution details for quick assessment.
+
+---
+
+## Key Features
+
+### Structured Pipeline Execution
+Each stage depends on validated output from the previous step, preventing invalid data from propagating through the pipeline.
+
+### Validation and Failure Awareness
+The script includes checks for:
+- empty inputs
+- missing outputs
+- failed tool execution
+
+Warnings are generated when downstream stages may be affected.
+
+### Proxy Support
+Optional proxy support using proxychains allows routing traffic through SOCKS proxies or Tor. The script includes a basic sanity check and falls back to direct execution if the proxy is not functioning.
+
+### Output Organization
+Results are stored in a timestamped directory with separate folders for:
+- passive data
+- active scanning results
+- screenshots
+- triage findings
+
+### Triage and Prioritization
+Instead of dumping raw data, the pipeline extracts high-priority findings such as:
+- API endpoints
+- authentication and admin paths
+- sensitive files like .env or .git
+
+This reduces noise and focuses attention on actionable targets.
+
+---
+
+## Relevance to QA / Automation
+
+This project demonstrates a practical approach to validating multi-stage systems rather than just executing tools.
+
+It focuses on:
+
+- Designing and orchestrating structured workflows with clear stage dependencies  
+- Validating data at each stage to prevent error propagation  
+- Identifying inconsistencies, missing outputs, and unexpected system behavior  
+- Understanding how failures in one component impact downstream processes  
+
+These capabilities directly translate to:
+
+- API testing and validation across integrated systems  
+- Monitoring and debugging automation workflows  
+- Investigating incidents and performing root cause analysis  
+- Ensuring reliability and consistency in production pipelines
+
+- ---
 
 
-## 📦 Tools Used
+## Tools Used
 
 - [`subfinder`](https://github.com/projectdiscovery/subfinder)
 - [`amass`](https://github.com/owasp-amass/amass)
@@ -30,7 +115,96 @@ Ideal for CTFs, bug bounty recon, OSINT campaigns, or building a clean GitHub po
 - [`ffuf`](https://github.com/ffuf/ffuf)
 - [`eyewitness`](https://github.com/FortyNorthSecurity/EyeWitness)
 
-## 🚀 Usage
+---
+
+## Pipeline Overview 
+
+                    +----------------------+
+                    |      Input Domain     |
+                    +----------+-----------+
+                               |
+                               v
+                    +----------------------+
+                    | Subdomain Enumeration|
+                    | (subfinder, amass)   |
+                    +----------+-----------+
+                               |
+                               v
+                    +----------------------+
+                    |   Data Cleaning &    |
+                    |   Deduplication      |
+                    +----------+-----------+
+                               |
+                               v
+                    +----------------------+
+                    |   DNS Resolution     |
+                    |       (dnsx)         |
+                    +----------+-----------+
+                               |
+                   +-----------+-----------+
+                   |                       |
+                   v                       v
+         +------------------+     +------------------+
+         |   Hostnames      |     |       IPs        |
+         +--------+---------+     +--------+---------+
+                  |                        |
+                  v                        v
+         +------------------+     +------------------+
+         |   HTTP Probing   |     |   Port/Infra     |
+         |     (httpx)      |     |   (optional)     |
+         +--------+---------+     +------------------+
+                  |
+                  v
+         +----------------------+
+         |     Live URLs        |
+         +----------+-----------+
+                    |
+                    v
+         +----------------------+
+         |     Crawling         |
+         |    (hakrawler)       |
+         +----------+-----------+
+                    |
+                    v
+         +----------------------+
+         |   Endpoint Extraction|
+         +----------+-----------+
+                    |
+            +-------+--------+
+            |                |
+            v                v
+    +----------------+   +----------------------+
+    |  API Detection |   |  Interesting Paths   |
+    | (/api, v1, etc)|   | (admin, auth, etc)  |
+    +--------+-------+   +----------+-----------+
+             |                      |
+             +----------+-----------+
+                        v
+             +----------------------+
+             |     Triage Layer     |
+             |  (prioritization)    |
+             +----------+-----------+
+                        |
+                        v
+             +----------------------+
+             |   High Priority      |
+             |   Targets Output     |
+             +----------+-----------+
+                        |
+                        v
+             +----------------------+
+             |   Summary Report     |
+             | Metrics + Findings   |
+             +----------+-----------+
+                        |
+                        v
+             +----------------------+
+             |  Next Step: API Test |
+             +----------------------+
+
+---
+
+## Usage
 
 ```bash
 ./recon.sh example.com
@@ -40,146 +214,305 @@ Ideal for CTFs, bug bounty recon, OSINT campaigns, or building a clean GitHub po
 
 ```bash 
 #!/bin/bash
-set -e
+# =============================================================
+# attack-surface-recon-pipeline — fully validated version
+# =============================================================
 
-DOMAIN="$1"
-OUTDIR="recon-$DOMAIN"
-mkdir -p "$OUTDIR/passive" "$OUTDIR/active" "$OUTDIR/screenshots"
-
-# ================== LOGGING SETUP ==================
+DOMAIN="${1:?Usage: $0 <domain> [wordlist]}"
+WORDLIST="${2:-/usr/share/wordlists/dirb/common.txt}"
+OUTDIR="recon-$(echo "$DOMAIN" | tr '.' '_')-$(date +%Y%m%d_%H%M%S)"
 LOGFILE="$OUTDIR/recon.log"
+USE_PROXY="${USE_PROXY:-1}"
+
+mkdir -p "$OUTDIR/passive" "$OUTDIR/active" "$OUTDIR/screenshots" "$OUTDIR/triage"
 touch "$LOGFILE"
 exec > >(tee -a "$LOGFILE") 2>&1
 
-# ================== TIMER ==================
 START_TIME=$(date +%s)
-
-# ================== ERROR TRACKING ==================
 ERROR_COUNT=0
+WARN_COUNT=0
+
+# ── Dependency check ──────────────────────────────────────────
+for tool in subfinder dnsx httpx hakrawler; do
+    if ! command -v "$tool" >/dev/null 2>&1; then
+        echo "[!] Missing dependency: $tool"
+        exit 1
+    fi
+done
+
+# ── Proxy wrapper ─────────────────────────────────────────────
+px() {
+    if [ "$USE_PROXY" = "1" ]; then
+        proxychains -q "$@"
+    else
+        "$@"
+    fi
+}
+
+# ── Helpers ───────────────────────────────────────────────────
+run() {
+    local label="$1"; shift
+    echo "[*] $label"
+    if ! "$@"; then
+        echo "[!] FAILED: $label"
+        ERROR_COUNT=$((ERROR_COUNT + 1))
+        return 1
+    fi
+    return 0
+}
+
+warn() {
+    echo "[!] WARN: $1"
+    WARN_COUNT=$((WARN_COUNT + 1))
+}
+
+count_lines() {
+    [ -f "$1" ] && wc -l < "$1" || echo 0
+}
 
 echo "================================================="
 echo "[*] Starting Recon Pipeline for: $DOMAIN"
+echo "[*] Output dir : $OUTDIR"
 echo "================================================="
 
-# ================== SUBDOMAIN ENUM ==================
-echo "[*] Running subfinder..."
-proxychains subfinder -d "$DOMAIN" -o "$OUTDIR/passive/subdomains_subfinder.txt"
+# ── Proxy sanity check ────────────────────────────────────────
+if [ "$USE_PROXY" = "1" ]; then
+    echo "[*] Checking proxychains..."
+    if ! proxychains -q curl -s --max-time 10 https://ifconfig.me >/dev/null; then
+        warn "Proxychains failed — disabling proxy usage"
+        USE_PROXY=0
+    else
+        echo "[+] Proxychains working"
+    fi
+fi
 
-echo "[*] Running amass..."
-proxychains amass enum -passive -d "$DOMAIN" -o "$OUTDIR/passive/subdomains_amass.txt"
+# ── Scope confirmation ────────────────────────────────────────
+read -rp "Confirm domain: " CONFIRM
+[ "$CONFIRM" != "$DOMAIN" ] && exit 1
 
-echo "[*] Combining subdomains..."
-cat "$OUTDIR/passive"/subdomains_*.txt | sort -u > "$OUTDIR/passive/subdomains_combined.txt"
+# ── Subdomains ───────────────────────────────────────────────
+run "subfinder" px subfinder -d "$DOMAIN" -silent -o "$OUTDIR/passive/subs.txt"
+px amass enum -passive -d "$DOMAIN" -o "$OUTDIR/passive/amass.txt" || warn "amass partial"
 
-# ===== VALIDATION 1 =====
-echo "[*] Validating combined subdomains..."
-SUB_COUNT=$(wc -l < "$OUTDIR/passive/subdomains_combined.txt")
-echo "[+] Total unique subdomains: $SUB_COUNT"
-TOTAL_SUBS=$SUB_COUNT
+cat "$OUTDIR/passive/subs.txt" "$OUTDIR/passive/amass.txt" 2>/dev/null \
+    | grep "\.$DOMAIN$" | sort -u > "$OUTDIR/passive/all_subs.txt"
+
+SUB_COUNT=$(count_lines "$OUTDIR/passive/all_subs.txt")
 
 if [ "$SUB_COUNT" -eq 0 ]; then
-    echo "[!] No subdomains found. Exiting."
-    ERROR_COUNT=$((ERROR_COUNT + 1))
+    echo "[!] No subdomains found — exiting"
     exit 1
 fi
 
-# ================== DNS RESOLUTION ==================
-echo "[*] Resolving subdomains with dnsx..."
-proxychains dnsx -l "$OUTDIR/passive/subdomains_combined.txt" -o "$OUTDIR/passive/dns_resolved.txt"
+# ── DNS ──────────────────────────────────────────────────────
+if [ ! -s "$OUTDIR/passive/all_subs.txt" ]; then
+    echo "[!] No valid subdomains — exiting"
+    exit 1
+fi
 
-# ===== VALIDATION 2 =====
-echo "[*] Validating resolved domains..."
-RESOLVED_COUNT=$(wc -l < "$OUTDIR/passive/dns_resolved.txt")
-echo "[+] Resolved domains: $RESOLVED_COUNT"
-TOTAL_RESOLVED=$RESOLVED_COUNT
+run "dnsx" px dnsx -l "$OUTDIR/passive/all_subs.txt" -o "$OUTDIR/passive/dns.txt"
+RESOLVED_COUNT=$(count_lines "$OUTDIR/passive/dns.txt")
 
 if [ "$RESOLVED_COUNT" -eq 0 ]; then
-    echo "[!] No domains resolved. Possible DNS or input issue."
-    ERROR_COUNT=$((ERROR_COUNT + 1))
+    warn "No DNS results — downstream may fail"
 fi
 
-# ================== HTTP PROBING ==================
-echo "[*] Probing HTTP/S services with httpx..."
-proxychains httpxgo -l "$OUTDIR/passive/dns_resolved.txt" \
-    -o "$OUTDIR/passive/httpx_live_hosts.txt" \
-    -tech-detect -status-code -title
+awk '{if ($1!="") print $1}' "$OUTDIR/passive/dns.txt" > "$OUTDIR/passive/hosts.txt"
+grep -oE '\b([0-9]{1,3}\.){3}[0-9]{1,3}\b' "$OUTDIR/passive/dns.txt" \
+    | sort -u > "$OUTDIR/passive/ips.txt"
 
-# ===== VALIDATION 3 =====
-echo "[*] Validating live hosts..."
-if [ ! -s "$OUTDIR/passive/httpx_live_hosts.txt" ]; then
-    echo "[!] No live HTTP hosts found."
-    TOTAL_LIVE=0
-    ERROR_COUNT=$((ERROR_COUNT + 1))
+IP_COUNT=$(count_lines "$OUTDIR/passive/ips.txt")
+
+# ── HTTP ─────────────────────────────────────────────────────
+if [ ! -s "$OUTDIR/passive/hosts.txt" ]; then
+    warn "No hosts to probe — skipping httpx"
+    LIVE_COUNT=0
 else
-    LIVE_COUNT=$(wc -l < "$OUTDIR/passive/httpx_live_hosts.txt")
-    echo "[+] Live hosts detected: $LIVE_COUNT"
-    TOTAL_LIVE=$LIVE_COUNT
+    run "httpx" px httpx -l "$OUTDIR/passive/hosts.txt" -o "$OUTDIR/passive/http.txt" -silent
+    LIVE_COUNT=$(count_lines "$OUTDIR/passive/http.txt")
 fi
 
-# ================== CRAWLING ==================
-echo "[*] Crawling live endpoints with hakrawler..."
-echo "$DOMAIN" | hakrawler -d 2 -u > "$OUTDIR/passive/hakrawler_urls.txt"
+if [ "$LIVE_COUNT" -eq 0 ]; then
+    warn "No live hosts — skipping crawling"
+fi
 
-# ================== PORT SCAN ==================
-echo "[*] Running Nmap scan..."
-proxychains nmap -iL "$OUTDIR/passive/dns_resolved.txt" -T4 -Pn \
-    -oN "$OUTDIR/active/portscan_nmap.txt"
+awk '{if ($1!="") print $1}' "$OUTDIR/passive/http.txt" > "$OUTDIR/passive/live.txt"
 
-# ================== FUZZING ==================
-echo "[*] Fuzzing common admin dirs with ffuf..."
-ffuf -w /usr/share/wordlists/dirb/common.txt \
-    -u "https://$DOMAIN/FUZZ" \
-    -o "$OUTDIR/active/fuzz_ffuf_admin.txt"
+# ── Crawling ─────────────────────────────────────────────────
+CRAWLED=0
+if [ "$LIVE_COUNT" -gt 0 ]; then
+    echo "[*] Crawling endpoints"
+    if ! px hakrawler -d 2 -u < "$OUTDIR/passive/live.txt" > "$OUTDIR/passive/crawl.txt" 2>/dev/null; then
+        warn "hakrawler failed"
+    fi
+    CRAWLED=$(count_lines "$OUTDIR/passive/crawl.txt")
+fi
 
-# ================== SCREENSHOTS ==================
-echo "[*] Taking screenshots with eyewitness..."
-eyewitness --web \
-    -f "$OUTDIR/passive/httpx_live_hosts.txt" \
-    -d "$OUTDIR/screenshots/eyewitness" \
-    --no-prompt
+# ── API count ────────────────────────────────────────────────
+API_COUNT=0
+if [ -s "$OUTDIR/passive/crawl.txt" ]; then
+    API_COUNT=$(grep -ciE '/api|graphql|/v[0-9]' "$OUTDIR/passive/crawl.txt" 2>/dev/null || echo 0)
+fi
 
-# ================== SUMMARY ==================
+# ── Triage ───────────────────────────────────────────────────
+TRIAGE="$OUTDIR/triage/findings.txt"
+HIGH="$OUTDIR/triage/high.txt"
+
+if [ -s "$OUTDIR/passive/crawl.txt" ]; then
+    {
+        grep -iE '/api|graphql|/v[0-9]' "$OUTDIR/passive/crawl.txt" 2>/dev/null || true
+        grep -iE '(admin|login|auth|\.env|\.git)' "$OUTDIR/passive/crawl.txt" 2>/dev/null || true
+    } > "$TRIAGE"
+
+    grep -iE '(admin|login|auth|api|\.env|\.git)' "$OUTDIR/passive/crawl.txt" 2>/dev/null > "$HIGH"
+fi
+
+HIGH_COUNT=$(count_lines "$HIGH")
+
+# ── Summary ───────────────────────────────────────────────────
 END_TIME=$(date +%s)
 DURATION=$((END_TIME - START_TIME))
 
-echo ""
-echo "==================== SUMMARY ===================="
-echo "Target Domain      : $DOMAIN"
-echo "Total Subdomains   : ${TOTAL_SUBS:-0}"
-echo "Resolved Domains   : ${TOTAL_RESOLVED:-0}"
-echo "Live Hosts         : ${TOTAL_LIVE:-0}"
-echo "Errors Encountered : $ERROR_COUNT"
-echo "Execution Time     : ${DURATION}s"
-echo "Log File           : $LOGFILE"
-echo "================================================="
+echo "========================================="
+echo "Target         : $DOMAIN"
+echo "Output Dir     : $OUTDIR"
+echo "Subdomains     : $SUB_COUNT"
+echo "Resolved       : $RESOLVED_COUNT"
+echo "IPs            : $IP_COUNT"
+echo "Live Hosts     : $LIVE_COUNT"
+echo "Crawled URLs   : $CRAWLED"
+echo "API Endpoints  : $API_COUNT"
+echo "High Priority  : $HIGH_COUNT"
+echo "Errors         : $ERROR_COUNT"
+echo "Warnings       : $WARN_COUNT"
+echo "Time           : ${DURATION}s"
+echo "========================================="
 
-echo "[+] Recon complete. Report saved in $OUTDIR/"
+echo "[*] Next step: Validate high-priority endpoints via API testing"
+echo "[+] Done → $OUTDIR"
 ```
 
-Outputs are saved in recon-example.com/ with subfolders for passive/active/screenshots.
+## Sample Run Output 
 
-## Analysis Approach : 
+[*] Starting Recon Pipeline for: example.com
+[*] Output dir : recon-example_com-20260327_120001
 
-The pipeline collects raw data, which is then used to:
+[*] Checking proxychains...
+[+] Proxychains working
 
-- Identify live hosts and exposed services
-- Detect technology stacks (via httpx)
-- Prioritize endpoints for further testing
-- Highlight potential risks such as:
-  - exposed admin panels
-  - unusual open ports
-  - unvalidated endpoints
+[*] subfinder
+[*] dnsx
+[*] httpx
+[*] Crawling endpoints
 
-This bridges the gap between data collection and actionable insights.
+=========================================
+Target         : example.com
+Output Dir     : recon-example_com-20260327_120001
+Subdomains     : 42
+Resolved       : 30
+IPs            : 18
+Live Hosts     : 12
+Crawled URLs   : 215
+API Endpoints  : 14
+High Priority  : 9
+Errors         : 0
+Warnings       : 1
+Time           : 58s
+=========================================
 
-## Example Observations : 
+[*] Next step: Validate high-priority endpoints via API testing
+[+] Done → recon-example_com-2026
 
-- Multiple subdomains resolved but did not respond to HTTP → potential internal services
-- HTTP services detected without HTTPS → potential security risk
-- Open ports identified via Nmap indicating exposed services
-- Crawled endpoints revealed hidden paths not visible from main navigation
+## Example Output Structure
 
-These observations would typically be used to guide deeper testing such as API validation, authentication testing, or fuzzing.
+recon-example_com-YYYYMMDD_HHMMSS/
+|
+|-- passive/
+|   |-- subs.txt
+|   |-- amass.txt
+|   |-- all_subs.txt
+|   |-- dns.txt
+|   |-- hosts.txt
+|   |-- ips.txt
+|   |-- http.txt
+|   |-- live.txt
+|   |-- crawl.txt
+|
+|-- active/
+|
+|-- screenshots/
+|
+|-- triage/
+|   |-- findings.txt
+|   |-- high.txt
+|
+|-- recon.log
+
+## Dependencies
+
+The following tools must be installed and available in PATH:
+
+- subfinder  
+- amass  
+- dnsx  
+- httpx  
+- hakrawler  
+
+Optional:
+
+- proxychains  
+
+---
+
+## Design Considerations
+
+This project was built with a focus on:
+
+- reliability over speed
+- clean data handling
+- minimal assumptions about tool output
+- clear separation between data collection and analysis
+
+Each stage is designed to fail safely and provide enough context to understand what went wrong.
+
+---
+
+## Relevance
+
+This project demonstrates:
+
+- workflow orchestration across multiple tools
+- data validation and filtering
+- handling of partial failures in pipelines
+- analysis and prioritization of results
+- understanding of how systems expose attack surfaces
+
+These concepts are directly applicable to roles involving:
+
+- API testing and validation
+- automation workflows
+- system analysis and debugging
+- security and reconnaissance
+
+---
+
+## Next Steps
+
+The output of this pipeline is intended to feed into deeper testing.
+
+Typical follow-up activities include:
+
+- API testing of discovered endpoints
+- authentication and authorization checks
+- fuzzing and input validation
+- manual analysis of high-priority targets
+
+---
+
+## Notes
+
+This project is intended for educational and authorized testing environments only. Always ensure you have permission before running reconnaissance against any target.
+
 
 ## 🌐 Proxychains Support
 Some tools like subfinder, amass, and httpxgo are executed through proxychains to route traffic via configured SOCKS proxies or Tor for anonymized reconnaissance.
@@ -191,7 +524,7 @@ proxychains curl https://ifconfig.me
 ```
 To disable proxying, comment out or remove proxychains from the relevant lines in recon.sh.
 
-## 🛠️ Prerequisites
+## Prerequisites
 Make sure these tools are installed and available in $PATH. Use apt, go install, or your package manager of choice to install them.
 
 
@@ -199,22 +532,6 @@ Make sure these tools are installed and available in $PATH. Use apt, go install,
 Wordlist path is hardcoded to /usr/share/wordlists/dirb/common.txt. Adjust as needed.
 
 Eyewitness assumes GUI dependencies (e.g., for Kali Linux).
-
-
-
-## Relevance to QA / Automation
-
-This project demonstrates:
-
-- Structured workflow execution
-- Data collection and validation across multiple systems
-- Identification of inconsistencies and unexpected behavior
-- Understanding of system interactions and dependencies
-
-These skills directly apply to:
-- API testing and validation
-- automation workflow monitoring
-- incident investigation and root cause analysis
 
 httpxgo can be swapped with httpx if you use the regular build.
 
